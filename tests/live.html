@@ -1,0 +1,30 @@
+<!doctype html><meta charset="utf-8"><title>Perchance transport live test (synthetic)</title>
+<h1>Perchance: synthetic transport test</h1>
+<p>No SillyTavern user data. One explicit click = one real generation.</p>
+<button id="old">Test v0.2 wrapper (180s)</button><button id="fixed">Test corrected transport</button>
+<button id="cancel">Cancel</button><pre id="log"></pre><div id="frame"></div><img id="image" alt="result">
+<script type="module">
+import { requestImage, PERCHANCE_ENDPOINT } from '../perchance-client.mjs';
+const log = document.querySelector('#log');
+const write = value => { log.textContent += JSON.stringify(value) + '\n'; };
+let controller;
+document.querySelector('#cancel').onclick = () => controller?.abort();
+document.querySelector('#fixed').onclick = async () => {
+ controller = new AbortController(); log.textContent = '';
+ try {
+  const result = await requestImage('red apple on a white background', { resolution:'512x512', signal:controller.signal, mount:document.querySelector('#frame'), onDiagnostic:write });
+  write(result);
+  document.querySelector('#image').src = result.url || result.dataUrl;
+  const r = await fetch(result.url, { credentials:'omit' }); const b = await r.blob();
+  write({download:r.status,type:b.type,bytes:b.size});
+ } catch(e) {write({error:e.message});}
+};
+document.querySelector('#old').onclick = () => {
+ log.textContent = ''; const f = document.createElement('iframe');
+ f.style='width:100%;height:400px'; f.src=PERCHANCE_ENDPOINT+'?prompt=red%20apple%20on%20a%20white%20background&format=json&id=old-wrapper-test';
+ const onMessage = e => { if(e.data?.api === 'perchance-image-api') write({api:e.data.api,origin:e.origin,ok:e.data.result?.ok}); };
+ window.addEventListener('message',onMessage); document.querySelector('#frame').replaceChildren(f);
+ f.onload=()=>write({stage:'outer-load'});
+ setTimeout(()=>{write({stage:'old-timeout'});window.removeEventListener('message',onMessage);},180000);
+};
+</script>

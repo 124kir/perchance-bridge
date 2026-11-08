@@ -1,0 +1,22 @@
+# Local archives, historical snapshots and development reports
+*.zip
+backups/
+CODEX_TASK.md
+TECHNICAL_REPORT.md
+
+# Local visual proof and generated test images
+tests/*.png
+tests/*.jpg
+!tests/perchance-apple.jpg
+!tests/professional-apple.jpg
+tests/*.jpeg
+tests/*.webp
+
+# Dependencies, logs and operating-system files
+node_modules/
+*.log
+.env
+.env.*
+!.env.example
+Thumbs.db
+.DS_Store

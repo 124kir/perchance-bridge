@@ -1,0 +1,40 @@
+<!doctype html><html lang="ru"><meta charset="utf-8"><title>Perchance Bridge — synthetic host</title>
+<link rel="stylesheet" href="../style.css">
+<style>body{font:16px system-ui;background:#202329;color:#eee;max-width:900px;margin:auto;padding:20px}button,a,select,input,textarea{font:inherit}button,.menu_button{padding:7px;cursor:pointer}textarea,input,select{background:#30343b;color:#fff;border:1px solid #777}.inline-drawer-content{display:block}a{color:#9bd}#synthetic-chat img{max-width:100%;max-height:400px}</style>
+<h1>Технический стенд Perchance Bridge</h1>
+<p>Синтетический контекст, имитация чата. Личные данные не загружаются. Загрузка изображения использует настоящий API текущего SillyTavern, если страница открыта на его порту.</p>
+<button id="fixture">Импортировать проверенный JPEG Perchance (яблоко)</button>
+<button id="fixture-professional">Импортировать JPEG Professional (Casual Photo)</button>
+<h2>Действия из меню чата (синтетический диалог)</h2><div id="extensionsMenu"></div>
+<div id="extensions_settings2"></div><h2>Имитация чата (не сохраняется)</h2><div id="synthetic-chat"></div><pre id="host-status"></pre>
+<script type="module">
+let headers={'Content-Type':'application/json'};
+try { const r=await fetch('/csrf-token'); if(r.ok){const j=await r.json();headers['X-CSRF-Token']=j.token;} } catch {}
+const callbacks=new Map();
+const c={extensionSettings:{},chat:[{is_user:true,mes:'Please draw a red apple on a white background.'}],name2:'PerchanceBridge-TransportTest',getCurrentChatId:()=> 'synthetic-transport-test',
+ getRequestHeaders:()=>headers,saveSettingsDebounced(){},saveChat:async()=>{document.querySelector('#host-status').textContent='Synthetic chat rendered; no real chat was saved.';},
+ eventTypes:{APP_READY:'ready',CHARACTER_MESSAGE_RENDERED:'render',MESSAGE_RECEIVED:'received',SD_PROMPT_PROCESSING:'sd'},
+ eventSource:{on:(n,f)=>callbacks.set(n,f),emit:async(n,...args)=>callbacks.get(n)?.(...args)},
+ addOneMessage:m=>{const image=document.createElement('img');image.src=m.extra.media[0].url;image.alt='Synthetic Perchance attachment';document.querySelector('#synthetic-chat').appendChild(image);},
+ registerFunctionTool:t=>{c.tool=t;},substituteParams:s=>s,
+ POPUP_TYPE:{CONFIRM:2},POPUP_RESULT:{AFFIRMATIVE:1,CANCELLED:null},
+ callGenericPopup:(content,type,value,options)=>new Promise(resolve=>{
+  const dialog=document.createElement('dialog');dialog.style.cssText='width:min(760px,90vw);background:#202329;color:#eee;border:1px solid #777;max-height:90vh;overflow:auto';
+  dialog.appendChild(content);
+  const finish=result=>{if(options.onClosing?.({result})===false)return;dialog.close();dialog.remove();resolve(result);};
+  for(const [label,result] of [[options.okButton,1],[options.cancelButton,null]]){const b=document.createElement('button');b.textContent=label;b.onclick=()=>finish(result);dialog.appendChild(b);}
+  dialog.addEventListener('cancel',e=>{e.preventDefault();finish(null);});document.body.appendChild(dialog);dialog.showModal();options.onOpen?.();
+ }),
+ generateQuietPrompt:async()=> 'red apple on a white background',
+ SlashCommandParser:{addCommandObject(){}},SlashCommand:{fromProps:o=>o},SlashCommandArgument:{fromProps:o=>o},ARGUMENT_TYPE:{STRING:'string'}};
+window.SillyTavern={getContext:()=>c};
+await import('../index.js');
+await callbacks.get('ready')?.();
+const importFixture=async filename=>{
+ const r=await fetch('./'+filename);const b=await r.blob();
+ const transfer=new DataTransfer();transfer.items.add(new File([b],'apple.jpg',{type:'image/jpeg'}));
+ const input=document.querySelector('#pb_image_import');input.files=transfer.files;input.dispatchEvent(new Event('change'));
+};
+document.querySelector('#fixture').onclick=()=>importFixture('perchance-apple.jpg');
+document.querySelector('#fixture-professional').onclick=()=>importFixture('professional-apple.jpg');
+</script></html>

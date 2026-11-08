@@ -1,0 +1,11 @@
+{
+  "display_name": "Perchance Bridge",
+  "loading_order": 5,
+  "requires": [],
+  "js": "index.js",
+  "css": "style.css",
+  "author": "Community prototype",
+  "version": "0.6.2",
+  "auto_update": false,
+  "minimum_client_version": "1.19.0"
+}

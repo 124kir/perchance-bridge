@@ -1,0 +1,18 @@
+<!doctype html><meta charset="utf-8"><title>Perchance companion probe — synthetic, no chat</title>
+<h1>Companion connection probe</h1><p>No chat or image prompt is sent. Opens only the public API documentation.</p>
+<button id="connect">Check companion</button><a id="target" target="_blank">Diagnostic tab</a><pre id="result"></pre>
+<script type="module">
+import {openPerchanceChannel} from '../perchance-client.mjs';
+let popup;
+const output=document.querySelector('#result');
+const report=x=>output.textContent+=JSON.stringify(x)+'\n';
+const win={location:window.location,crypto:window.crypto,
+ addEventListener:window.addEventListener.bind(window),removeEventListener:window.removeEventListener.bind(window),
+ setTimeout:window.setTimeout.bind(window),clearTimeout:window.clearTimeout.bind(window),
+ open(url,target){document.querySelector('#target').href=url;popup=window.open(url,target);return popup;}};
+document.querySelector('#connect').onclick=async()=>{
+ output.textContent='';
+ try {await openPerchanceChannel({onDiagnostic:report},{window:win});report({ready:true});}
+ catch(e){report({error:e.message,windowReportedClosed:popup?.closed??null});}
+};
+</script>
