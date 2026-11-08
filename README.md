@@ -1,49 +1,56 @@
 # Perchance Bridge
 
-Расширение для SillyTavern помогает составить промпт для изображения и отправить его в Perchance через открытую вкладку браузера. Интерфейс — на русском языке.
+Bring images into your SillyTavern chats with Perchance. Generate good-looking images for free using a browser-based service: there is no ComfyUI installation, local image model, powerful GPU or dedicated image-generation hardware to set up. You can write a prompt yourself or ask your connected text model to describe the current scene.
 
-Версия расширения: **0.6.2**; версия вспомогательного userscript: **0.5.0**. Минимальная версия SillyTavern согласно манифесту — **1.19.0**.
+Perchance is a third-party service: availability, quality and any usage limits depend on that service. Using a text model to prepare a prompt may incur charges from your text-model provider; you can enter a prompt manually instead.
 
-## Возможности
+**Extension:** 0.7.0 · **Companion userscript:** 0.5.0 · **Minimum SillyTavern version:** 1.19.0
 
-- Генерация по готовому промпту, из меню чата, с помощью команд и инструмента модели.
-- Подготовка промпта по контексту диалога с использованием подключённой текстовой модели и штатных шаблонов SillyTavern.
-- Редактируемый предпросмотр промпта перед отправкой, локальные текстовые стили, негативный промпт и серии от 1 до 8 изображений.
-- Ручной импорт изображения, например полученного в Perchance Professional.
+## Features
 
-Bridge работает отдельно от штатного backend Image Generation: команда `/sd` продолжает использовать свои настройки. Локальные текстовые стили Bridge не являются встроенными стилями Perchance Professional.
+- Generate from a prompt, chat menu, slash command or AI tool.
+- Draft prompts from the chat using the connected text model and SillyTavern's Image Generation templates.
+- Review and edit prompts before sending; use negative prompts, text-based styles and batches of 1–8 images.
+- Import images made manually, including in Perchance Professional.
+- English interface by default, with a Russian option in extension settings.
 
-## Установка
+Bridge is separate from the built-in Image Generation backend: `/sd` continues to use its own configuration. Bridge's text styles are not Perchance Professional's native styles.
 
-1. Поместите файлы расширения в `public/scripts/extensions/third-party/perchance-bridge` внутри установки SillyTavern и обновите страницу SillyTavern.
-2. Установите менеджер userscript в том же браузере. Создайте в нём скрипт из файла `perchance-companion.user.js` и сохраните. При обновлении замените код существующего скрипта на версию 0.5.0.
-3. Откройте SillyTavern через `localhost` или `127.0.0.1`, откройте настройки расширения Perchance Bridge и нажмите «Подключить канал — открыть вкладку Perchance».
-4. При необходимости пройдите проверку доступа на странице Perchance вручную. Оставьте вкладку открытой, введите промпт и запустите генерацию из панели или меню чата.
+## Installation
 
-Userscript использует API хранилища менеджера для обмена между локальной страницей SillyTavern и вкладкой Perchance. Он работает на локальных адресах, странице Perchance Image API и указанном в файле домене вложенного генератора. Если адрес генератора или ограничения сайта изменятся, канал может перестать работать. Экспериментальный режим iframe также может блокироваться браузером или сайтом; доступен ручной импорт результата.
+1. Install this repository in SillyTavern's `public/scripts/extensions/third-party/perchance-bridge` directory and refresh SillyTavern.
+2. Install a userscript manager in the same browser. Create a script from [perchance-companion.user.js](perchance-companion.user.js) and save it. If upgrading an existing companion, replace its contents with version 0.5.0.
+3. Open SillyTavern on `localhost` or `127.0.0.1`, open the Perchance Bridge settings and click **Connect channel — open Perchance tab**.
+4. Complete any Perchance access check manually. Keep the tab open, enter a prompt and generate from the panel or chat menu.
 
-## Использование
+To change the interface language, select **Language / Язык** in the extension settings and refresh the SillyTavern page. The choice is saved.
 
-`/perchance текст промпта` запускает генерацию по готовому описанию; `/perchance` без аргументов составляет описание из диалога. Также доступны `/perchance-you`, `/perchance-face`, `/perchance-me`, `/perchance-story`, `/perchance-last`, `/perchance-raw-last`, `/perchance-background`, `/perchance-cast`, `/perchance-count 3` и `/perchance-style anime`. Режим Raw Last использует последнее несистемное сообщение без запроса к текстовой модели. Фоновый режим добавляет изображение в чат, а не меняет фон интерфейса.
+The companion uses userscript-manager storage to communicate between local SillyTavern and the Perchance tab. It runs on local addresses, the Perchance Image API page and the embedded generator host listed in the script. Changes to the host, browser or site restrictions may break the connection. The experimental iframe mode can also be blocked; manual image import is available.
 
-По умолчанию перед отправкой показывается окно проверки описания и негативного промпта. Для серии подтверждение одно; изображения создаются последовательно. При отмене или ошибке оставшиеся запросы не запускаются, уже полученные результаты сохраняются. Отмена локального ожидания не гарантирует остановку генерации в открытой вкладке Perchance.
+## Usage
 
-## Данные и ограничения
+`/perchance a red fox in the forest` generates from a supplied prompt. `/perchance` without an argument drafts a prompt from the chat. Other commands include `/perchance-you`, `/perchance-face`, `/perchance-me`, `/perchance-story`, `/perchance-last`, `/perchance-raw-last`, `/perchance-background`, `/perchance-cast`, `/perchance-count 3` and `/perchance-style anime`.
 
-При подготовке описания из диалога контекст передаётся подключённой текстовой модели через SillyTavern и может тарифицироваться её провайдером. В Perchance передаются итоговый визуальный промпт и параметры генерации. Сообщения транспорта временно проходят через хранилище менеджера userscript; скрипт удаляет значения после отправки. Диагностика Bridge содержит технические события и счётчики, без текста промптов и ответов модели.
+Raw Last uses the latest non-system message without calling the text model. Background adds an image to the chat; it does not change the interface background.
 
-Синтетические тесты проверяют код и транспорт, но не гарантируют работу с конкретной версией браузера, менеджером userscript или текущим состоянием Perchance. Полная живая цепочка с companion 0.5.0 пока не подтверждена. Проверяйте настройки и доступность сервиса в своей среде.
+Prompt review is enabled by default. A batch is confirmed once and generated sequentially. Cancellation or an error stops remaining requests; completed results are kept. Cancelling local waiting does not guarantee that generation in the Perchance tab has stopped.
 
-## Разработка и тесты
+## Data and limitations
 
-Для синтетических тестов требуется Node.js с поддержкой встроенного test runner:
+When drafting from chat, SillyTavern sends context to your configured text-model provider. The final visual prompt and generation parameters are sent to Perchance. Transport messages temporarily pass through userscript-manager storage and are deleted after sending. Bridge diagnostics record technical events and counts rather than prompt or model response text.
+
+Synthetic tests verify the code and transport, but cannot guarantee compatibility with every browser, userscript manager or current state of Perchance. The complete live workflow with companion 0.5.0 has not yet been verified end to end.
+
+## Development
+
+Run the synthetic tests with a Node.js version that supports the built-in test runner:
 
 ```powershell
 node --test tests/*.test.mjs
 ```
 
-Тесты не требуют пользовательских чатов или подключения к Perchance. Вспомогательные HTML-стенды в `tests/` предназначены для разработки; отдельные действия на них могут запускать реальные запросы, поэтому проверяйте их назначение перед использованием.
+The tests do not require personal chats or a connection to Perchance. The HTML development fixtures in `tests/` may offer actions that make real requests; check their purpose before using them.
 
-## Лицензия
+## License
 
-Проект распространяется по [лицензии MIT](LICENSE).
+[MIT](LICENSE).

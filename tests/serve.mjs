@@ -6,7 +6,7 @@ const files = new Map([
  ['/perchance-client.mjs', new URL('../perchance-client.mjs', import.meta.url)],
  ['/companion-channel.mjs', new URL('../companion-channel.mjs', import.meta.url)],
  ['/tests/host.html', new URL('./host.html', import.meta.url)],
- ...['index.js','style.css','presets.mjs','professional-styles.json','prompt-builder.mjs','prompt-diagnostics.mjs'].map(name=>['/'+name,new URL('../'+name,import.meta.url)]),
+ ...['index.js','style.css','presets.mjs','professional-styles.json','prompt-builder.mjs','prompt-diagnostics.mjs','i18n.mjs'].map(name=>['/'+name,new URL('../'+name,import.meta.url)]),
 ]);
 http.createServer(async (req,res) => {
  const file = files.get(req.url?.split('?')[0]);

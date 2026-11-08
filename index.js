@@ -3,6 +3,7 @@ import { BUILTIN_STYLES, normalizeStyles, selectedStyle, composePrompt, composeN
 import professionalCatalogue from './professional-styles.json' with { type: 'json' };
 import { summarizeModelProbe } from './prompt-diagnostics.mjs';
 import { requestChatPrompt, promptTokenLimit } from './prompt-builder.mjs';
+import { translate } from './i18n.mjs';
 
 const KEY = 'perchance_bridge';
 const TOOL_NAME = 'GeneratePerchanceImage';
@@ -13,6 +14,7 @@ const DEFAULTS = {
     transport: 'tab',
     promptTokens: 4096,
     imageCount: 1,
+    language: 'en',
 };
 function imageCount(value) { const n=Number(value);return Number.isInteger(n)?Math.max(1,Math.min(8,n)):1; }
 const ctx = () => SillyTavern.getContext();
@@ -47,13 +49,14 @@ function settings() {
     return s;
 }
 function save() { ctx().saveSettingsDebounced(); }
+function tr(text) { return translate(text, settings().language); }
 function $(id) { return ui?.panel.querySelector(`#${id}`); }
 function status(msg, error = false) {
-    if (ui) { ui.status.textContent = msg; ui.status.classList.toggle('error', error); }
+    if (ui) { ui.status.textContent = tr(msg); ui.status.classList.toggle('error', error); }
 }
 function notice(msg, error = false) {
     status(msg, error);
-    if (window.toastr) window.toastr[error ? 'error' : 'info'](msg, 'Perchance Bridge');
+    if (window.toastr) window.toastr[error ? 'error' : 'info'](tr(msg), 'Perchance Bridge');
     else console[error ? 'error' : 'info']('[Perchance Bridge]', error ? 'Ошибка; подробности в панели расширения.' : 'Статус обновлен в панели расширения.');
 }
 function chatId(c = ctx()) { return String(c.getCurrentChatId?.() ?? c.chatId ?? ''); }
@@ -61,7 +64,7 @@ function diagnostic(event) {
     diagnostics.push({ time: new Date().toISOString(), ...event });
     if (diagnostics.length > 80) diagnostics.shift();
     if ($('pb_diagnostics')) $('pb_diagnostics').textContent = diagnostics.map(e => JSON.stringify(e)).join('\n');
-    if (event.stage === 'complete') $('pb_channel').textContent = 'Канал подтвердил получение результата';
+    if (event.stage === 'complete') $('pb_channel').textContent = tr('Канал подтвердил получение результата');
     if (event.stage === 'failed') $('pb_channel').textContent = `Канал: ${event.code}`;
 }
 function assertToolExclusive() {
@@ -82,7 +85,7 @@ async function connectChannel() {
         channelReady = false;
         channelWindow = await openPerchanceChannel({onDiagnostic:diagnostic});
         channelReady = true;
-        $('pb_channel').textContent = 'Companion подтвердил связь. Работа генератора еще не проверена.';
+        $('pb_channel').textContent = tr('Companion подтвердил связь. Работа генератора еще не проверена.');
         status('Канал подключен. Можно вызвать /perchance из диалога.');
     } catch (error) { channelReady = false;notice(error.message,true); }
     finally {connecting = false;$('pb_connect').disabled = false;}
@@ -157,7 +160,7 @@ async function postImageToChat(src, prompt, startId, options = {}) {
     const message = {
         name: c.groupId ? 'Perchance' : (c.name2 || 'Perchance'),
         is_user: false, is_system: false, send_date: new Date().toISOString(),
-        mes: options.messageText || '[Изображение Perchance]',
+        mes: options.messageText || (settings().language === 'ru' ? '[Изображение Perchance]' : '[Perchance image]'),
         extra: {
             media: [{ url: src, type: 'image', title: prompt, source: 'generated', negative: options.negative || '' }],
             media_display: 'gallery', media_index: 0, inline_image: false,
@@ -189,20 +192,23 @@ async function replaceTag(message, tag, src, startId) {
 async function reviewImagePrompt(c,{prompt,negative,style,prefix,count,resolution,reviewNotice=''},signal){
     const content=document.createElement('div');content.className='pb-prompt-review';
     content.innerHTML='<h3>Промпт перед отправкой в Perchance</h3><p id="pb_review_summary"></p><label for="pb_review_prompt">Описание — можно отредактировать</label><textarea id="pb_review_prompt" class="text_pole" rows="8"></textarea><label for="pb_review_negative">Негативный промпт — можно отредактировать</label><textarea id="pb_review_negative" class="text_pole" rows="2"></textarea><label for="pb_review_final">Итоговый промпт со стилем</label><textarea id="pb_review_final" class="text_pole" rows="4" readonly></textarea><p id="pb_review_error" role="alert"></p>';
+    content.innerHTML=tr(content.innerHTML);
     const field=content.querySelector('#pb_review_prompt'),neg=content.querySelector('#pb_review_negative');
     const final=content.querySelector('#pb_review_final'),error=content.querySelector('#pb_review_error');
     field.value=prompt;neg.value=negative;
-    content.querySelector('#pb_review_summary').textContent=`${reviewNotice?reviewNotice+' ':''}Картинок: ${count}. Размер: ${resolution}. Стиль: ${style.name}. Стиль добавляется к описанию автоматически.`;
+    content.querySelector('#pb_review_summary').textContent=settings().language==='ru'
+        ? `${reviewNotice?reviewNotice+' ':''}Картинок: ${count}. Размер: ${resolution}. Стиль: ${style.name}. Стиль добавляется к описанию автоматически.`
+        : `${reviewNotice?tr(reviewNotice)+' ':''}Images: ${count}. Resolution: ${resolution}. Style: ${style.name}. The style is added automatically.`;
     const validate=()=>{
         try{
             final.value=composePrompt(field.value,style,prefix);
             if(neg.value.trim().length>1000)throw Error('Негативный промпт длиннее 1000 символов.');
             error.textContent='';return true;
-        }catch(e){final.value='';error.textContent=e.message;return false;}
+        }catch(e){final.value='';error.textContent=tr(e.message);return false;}
     };
     field.addEventListener('input',validate);neg.addEventListener('input',validate);validate();
     const yes=c.POPUP_RESULT?.AFFIRMATIVE ?? 1, no=c.POPUP_RESULT?.CANCELLED ?? null;
-    const options={wide:true,leftAlign:true,okButton:count>1?`Создать картинки (${count})`:'Создать изображение',cancelButton:'Отмена',
+    const options={wide:true,leftAlign:true,okButton:count>1?(settings().language==='ru'?`Создать картинки (${count})`:`Generate images (${count})`):tr('Создать изображение'),cancelButton:tr('Отмена'),
         onOpen:()=>field.focus(),onClosing:dialog=>dialog.result!==yes || validate()};
     let dialog;
     const abort=()=>{if(dialog)void dialog.complete(no);};
@@ -293,7 +299,9 @@ async function generate(prompt, target = null, { auto = false, popup = null, cou
             let posted = false;
             if (chatId() === startId && ctx().chat === startChat) {
                 if (target) { await replaceTag(target.message, target.tag, stored.src, startId); posted = true; }
-                else posted = await postImageToChat(stored.src, original, startId, { negative, messageText: count>1?`[Изображение Perchance ${index+1}/${count}]`:auto ? '[Персонаж создал изображение]' : '[Изображение Perchance]' });
+                else posted = await postImageToChat(stored.src, original, startId, { negative, messageText: settings().language === 'ru'
+                    ? (count>1?`[Изображение Perchance ${index+1}/${count}]`:auto ? '[Персонаж создал изображение]' : '[Изображение Perchance]')
+                    : (count>1?`[Perchance image ${index+1}/${count}]`:auto ? '[Character generated an image]' : '[Perchance image]') });
             }
             results.push(stored.src);
             status(!posted ? 'Чат изменился или не открыт. Результат остался в предпросмотре.' : stored.local ? 'Готово. Картинка сохранена в SillyTavern.' : 'Готово. В чате внешняя ссылка; локальное сохранение отключено или недоступно.');
@@ -425,6 +433,7 @@ function addChatActions() {
     container.id = 'pb_chat_actions'; container.className = 'extension_container';
     const controls=document.createElement('div');controls.className='pb-menu-controls';
     controls.innerHTML='<label for="pb_menu_style">Perchance: стиль</label><select id="pb_menu_style" class="text_pole"></select><label for="pb_menu_count">Картинок (1–8)</label><input id="pb_menu_count" class="text_pole" type="number" min="1" max="8" step="1"><label for="pb_menu_review">Предпросмотр промпта</label><input id="pb_menu_review" type="checkbox">';
+    controls.innerHTML=tr(controls.innerHTML);
     // ST closes the wand menu on clicks bubbling to html. Keep settings interactive;
     // action buttons outside this controls block still close the menu normally.
     controls.addEventListener('click',event=>event.stopPropagation());
@@ -444,7 +453,7 @@ function addChatActions() {
     ]) {
         const button = document.createElement('button');
         button.type = 'button'; button.className = 'list-group-item flex-container flexGap5';
-        button.textContent = label; button.addEventListener('click',action); container.appendChild(button);
+        button.textContent = tr(label); button.addEventListener('click',action); container.appendChild(button);
     }
     menu.appendChild(container);
     rebuildStyles();
@@ -527,11 +536,12 @@ function rebuildStyles() {
     const select = $('pb_style');
     select.replaceChildren();
     const s = settings();
-    for (const style of normalizeStyles(s.styles)) makeOption(select, style.id, style.name);
+    const label = style => BUILTIN_STYLES.some(b => b.id === style.id && b.name === style.name) ? tr(style.name) : style.name;
+    for (const style of normalizeStyles(s.styles)) makeOption(select, style.id, label(style));
     if (!s.styles.some(style => style.id === s.styleId)) s.styleId = s.styles[0].id;
     select.value = s.styleId;
     const quick=document.getElementById('pb_menu_style');
-    if(quick){quick.replaceChildren();for(const style of normalizeStyles(s.styles))makeOption(quick,style.id,style.name);quick.value=s.styleId;}
+    if(quick){quick.replaceChildren();for(const style of normalizeStyles(s.styles))makeOption(quick,style.id,label(style));quick.value=s.styleId;}
     showStyleEditor();
 }
 function addPanel() {
@@ -541,8 +551,9 @@ function addPanel() {
     panel.id = 'perchance_bridge_panel';
     panel.innerHTML = `
     <div class="inline-drawer">
-      <div class="inline-drawer-toggle inline-drawer-header"><b>Perchance Bridge 0.6.2</b><div class="inline-drawer-icon fa-solid fa-circle-chevron-down down"></div></div>
+      <div class="inline-drawer-toggle inline-drawer-header"><b>Perchance Bridge 0.7.0</b><div class="inline-drawer-icon fa-solid fa-circle-chevron-down down"></div></div>
       <div class="inline-drawer-content pb-root">
+        <label for="pb_language">Language / Язык</label><select id="pb_language" class="text_pole"><option value="en">English</option><option value="ru">Русский</option></select>
         <div class="pb-intro">SillyTavern → промпт → Perchance → картинка в чат</div>
         <div id="pb_channel">Канал еще не проверен реальной генерацией в этой сессии</div>
         <button id="pb_connect" class="menu_button">Подключить канал — открыть вкладку Perchance</button>
@@ -616,11 +627,18 @@ function addPanel() {
         <p class="pb-small">Интерфейс генерации: <a href="https://perchance.org/perchance-ai-api" rel="noopener noreferrer" target="_blank">Perchance Image API</a>. Стили здесь — текстовые пресеты, не встроенные переключатели Professional. Команды: <code>/perchance ...</code> и <code>/perchance-scene</code>.</p>
       </div>
     </div>`;
+    panel.innerHTML = tr(panel.innerHTML);
     mount.appendChild(panel);
     ui = { panel, prompt: panel.querySelector('#pb_prompt'), preview: panel.querySelector('#pb_preview'), link: panel.querySelector('#pb_link'), status: panel.querySelector('#pb_status'), generateBtn: panel.querySelector('#pb_generate'), lastComposed: panel.querySelector('#pb_composed') };
     const s = settings();
+    $('pb_language').value = s.language;
+    $('pb_language').addEventListener('change', e => {
+        s.language = e.target.value === 'ru' ? 'ru' : 'en';
+        save();
+        status(s.language === 'ru' ? 'Язык сохранён. Обновите страницу SillyTavern, чтобы применить его.' : 'Language saved. Refresh SillyTavern to apply it.');
+    });
     ui.prompt.value = s.lastPrompt;
-    $('pb_native_text').textContent = s.lastNativePrompt || 'Промпт пока не получен.';
+    $('pb_native_text').textContent = s.lastNativePrompt || tr('Промпт пока не получен.');
     $('pb_from_native').disabled = !s.lastNativePrompt;
     for (const size of ALLOWED_RESOLUTIONS) makeOption($('pb_resolution'), size, size);
     rebuildStyles();
@@ -737,11 +755,11 @@ function addPanel() {
 function registerCommands() {
     const c = ctx();
     const add = (name, callback, required, help) => c.SlashCommandParser.addCommandObject(c.SlashCommand.fromProps({
-        name, callback, returns: 'URL изображения или текст промпта',
+        name, callback, returns: tr('URL изображения или текст промпта'),
         unnamedArgumentList: [c.SlashCommandArgument.fromProps({
-            description: 'Текст визуального промпта', typeList: [c.ARGUMENT_TYPE.STRING], isRequired: required,
+            description: tr('Текст визуального промпта'), typeList: [c.ARGUMENT_TYPE.STRING], isRequired: required,
         })],
-        helpString: help,
+        helpString: tr(help),
     }));
     add('perchance', async (_named, prompt) => {
         const text = String(prompt || '').trim();
@@ -771,7 +789,7 @@ function initialize() {
         const c = ctx(), t = c.eventTypes ?? c.event_types;
         if (t?.CHARACTER_MESSAGE_RENDERED) c.eventSource.on(t.CHARACTER_MESSAGE_RENDERED, onMessageRendered);
         if (t?.SD_PROMPT_PROCESSING) c.eventSource.on(t.SD_PROMPT_PROCESSING, captureNativePrompt);
-        console.info('[Perchance Bridge] v0.6.2 loaded');
+        console.info('[Perchance Bridge] v0.7.0 loaded');
     } catch (err) { initialized = false; console.error('[Perchance Bridge] Ошибка инициализации:', err); }
 }
 const c = ctx(), eventTypes = c.eventTypes ?? c.event_types;

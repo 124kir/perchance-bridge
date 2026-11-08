@@ -9,19 +9,20 @@ import {connectStorageChannel} from '../companion-channel.mjs';
 import {fixture} from './companion-fixture.mjs';
 import {summarizeModelProbe} from '../prompt-diagnostics.mjs';
 import {requestChatPrompt,promptTokenLimit} from '../prompt-builder.mjs';
+import {translate} from '../i18n.mjs';
 const source=await readFile(new URL('../index.js',import.meta.url),'utf8');
 const professionalCatalogue=JSON.parse(await readFile(new URL('../professional-styles.json',import.meta.url),'utf8'));
-function setup() {
+function setup(language='ru') {
  const elements=new Map(), handlers=new Map(), commands=new Map(), calls=[];
  function element(id='') {
   const el={id,value:'',hidden:false,checked:false,children:[],listeners:{},classList:{toggle(){}},style:{},
    appendChild(n){this.children.push(n);},replaceChildren(){this.children=[];},focus(){},click(){return this.listeners.click?.();},
    addEventListener(n,f){this.listeners[n]=f;},querySelector(q){return elements.get(q.slice(1));}};
-  Object.defineProperty(el,'innerHTML',{set(html){for(const m of html.matchAll(/id="([^"]+)"/g)) elements.set(m[1],element(m[1]));}});
+  Object.defineProperty(el,'innerHTML',{get(){return this._html || '';},set(html){this._html=html;for(const m of html.matchAll(/id="([^"]+)"/g)) elements.set(m[1],element(m[1]));}});
   return el;
  }
  const mount=element(), menu=element();
- const c={extensionSettings:{perchance_bridge:{transport:'iframe',nativeMirror:true,styles:[{id:'mine',name:'Mine',positive:'cinematic',negative:''}],styleId:'mine'},sd:{prompts:{5:'native portrait of {{char}}'}}},
+ const c={extensionSettings:{perchance_bridge:{language,transport:'iframe',nativeMirror:true,styles:[{id:'mine',name:'Mine',positive:'cinematic',negative:''}],styleId:'mine'},sd:{prompts:{5:'native portrait of {{char}}'}}},
   chat:[{is_user:false,mes:'Synthetic scene'}],getCurrentChatId:()=>c.currentId,currentId:'synthetic',name2:'Synthetic',
   eventTypes:{SD_PROMPT_PROCESSING:'sd',CHARACTER_MESSAGE_RENDERED:'render'},
   eventSource:{on:(n,f)=>handlers.set(n,f),emit:async()=>{}},saveSettingsDebounced(){},addOneMessage:m=>calls.push(['message',m]),saveChat:async()=>calls.push(['save']),
@@ -35,7 +36,7 @@ function setup() {
  const document={readyState:'loading',getElementById:id=>id==='extensions_settings2'?mount:id==='extensionsMenu'?menu:elements.get(id),createElement:()=>element(),addEventListener(){}};
  const popups=[];
  const open=()=>{calls.push(['open']);const p={closed:false,location:{href:'about:blank'},close(){this.closed=true;}};popups.push(p);return p;};
- const context={...presets,openPerchanceChannel:async()=>open(),requestChatPrompt,promptTokenLimit,summarizeModelProbe,professionalCatalogue,ALLOWED_RESOLUTIONS,findImageTag,markdownImage,requestImage:(...args)=>transport(...args),SillyTavern:{getContext:()=>c},
+ const context={...presets,translate,openPerchanceChannel:async()=>open(),requestChatPrompt,promptTokenLimit,summarizeModelProbe,professionalCatalogue,ALLOWED_RESOLUTIONS,findImageTag,markdownImage,requestImage:(...args)=>transport(...args),SillyTavern:{getContext:()=>c},
   document,window:{open,toastr:{info(){},error(){}}},AbortController,console,Blob,URL,setTimeout,
   createImageBitmap:async()=>({close(){}}),
   FileReader:class {readAsDataURL(){this.result='data:image/png;base64,AAAA';queueMicrotask(()=>this.onload());}},
@@ -47,8 +48,27 @@ function setup() {
  vm.createContext(context);
  vm.runInContext(source.replace(/^import .*;\r?\n/gm,'')+'\nglobalThis.testAPI={initialize,generate,draftFromChat,captureNativePrompt,settings,onMessageRendered};',context);
  context.testAPI.initialize();
- return {c,calls,elements,commands,menu,popups,api:context.testAPI,setTransport:f=>transport=f,setConnector:f=>context.openPerchanceChannel=f};
+ return {c,calls,elements,commands,menu,mount,popups,api:context.testAPI,setTransport:f=>transport=f,setConnector:f=>context.openPerchanceChannel=f};
 }
+test('language defaults to English and changing it preserves existing settings',()=>{
+ const h=setup('en');
+ delete h.c.extensionSettings.perchance_bridge.language;
+ assert.equal(h.api.settings().language,'en');
+ assert.equal(h.elements.get('pb_language').value,'en');
+ assert.match(h.mount.children[0].innerHTML,/Connect channel — open Perchance tab/);
+ assert.ok(h.menu.children[0].children.some(b=>b.textContent==='Perchance — image from chat'));
+ h.elements.get('pb_language').listeners.change({target:{value:'ru'}});
+ assert.equal(h.api.settings().language,'ru');
+ assert.equal(h.api.settings().styles[0].name,'Mine');
+ assert.match(h.elements.get('pb_status').textContent,/Обновите страницу/);
+});
+test('English prompt review preserves prompt contents',async()=>{
+ const h=setup('en');
+ await h.api.generate('synthetic apple');
+ const review=h.calls.find(x=>x[0]==='review')[1];
+ assert.match(review.innerHTML,/Prompt before sending to Perchance/);
+ assert.equal(h.calls.find(x=>x[0]==='request')[1],'synthetic apple, cinematic');
+});
 test('migrates only own settings, backs up old mirror, never mirrors native requests',async()=>{
  const h=setup(); assert.equal(h.api.settings().nativeMirror,false);assert.equal(h.api.settings().backupV02.nativeMirror,true);
  h.api.captureNativePrompt({prompt:'native synthetic'});await Promise.resolve();
